@@ -1,28 +1,81 @@
-version: '3.9'
+version: '3.8'
 
 services:
-  web:
-    build: .
+  db:
+    image: postgres:15-alpine
+    container_name: reward_platform_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
     volumes:
-      - .:/app
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - reward_platform_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: reward_platform_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - reward_platform_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reward_platform_api
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     depends_on:
       - db
       - redis
+    networks:
+      - reward_platform_network
 
-  db:
-    image: postgres:13
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reward_platform_test
     environment:
-      POSTGRES_DB: rewards_db
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-    ports:
-      - "5432:5432"
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - db
+      - redis
+    networks:
+      - reward_platform_network
+    command: >
+      sh -c "python manage.py migrate --noinput && 
+             python manage.py test --noinput"
 
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  reward_platform_network:
+    driver: bridge

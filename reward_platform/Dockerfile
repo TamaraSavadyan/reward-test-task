@@ -4,9 +4,19 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY requirements.txt requirements-test.txt ./
+
+# Install dependencies
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install -r requirements-test.txt
 
 COPY . .
 
-CMD ["gunicorn", "reward_platform.wsgi:application", "--bind", "0.0.0.0:8000"]
+# Make entrypoint script executable and set proper permissions
+RUN chmod +x /app/entrypoint.sh && \
+    chown -R root:root /app && \
+    chmod -R 755 /app
+
+# Use the entrypoint script
+ENTRYPOINT ["/app/entrypoint.sh"]

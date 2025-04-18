@@ -6,3 +6,5 @@ psycopg2-binary
 celery
 redis
 gunicorn
+drf_yasg
+whitenoise==6.6.0
